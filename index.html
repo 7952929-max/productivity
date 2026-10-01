@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-<title>DONEVO Radial v4</title>
+<title>Productivity Map</title>
 <style>
 :root{
   --bg:#0b0c0e;
@@ -1567,15 +1567,19 @@ html,body{width:100%;max-width:100%;overflow-x:hidden;overscroll-behavior:none}
 <meta name="theme-color" content="#f6f6f6">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Donevo">
+<meta name="apple-mobile-web-app-title" content="Productivity Map">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" href="icon-192.png">
+<style id="pm-brand">
+.brand b{display:block;font-size:19px!important;line-height:1.02!important;letter-spacing:.01em!important;white-space:normal!important}
+@media(min-width:641px){.brand b{font-size:24px!important;line-height:1.05!important}}
+</style>
 </head>
 <body>
 <div id="app">
   <div class="topbar">
-    <div class="brand"><b>DONEVO</b></div>
+    <div class="brand"><b>PRODUCTIVITY<br>MAP</b></div>
     <div class="top-actions">
       <button class="icon view-toggle active" id="homeBtn" title="Карта" aria-label="Карта"><svg class="lucide" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 21.95V18a2 2 0 0 0-2-2 2 2 0 0 1-2-2v-1a2 2 0 0 0-2-2H2.05"/><path d="M21.54 15H17a2 2 0 0 0-2 2v4.54"/><path d="M7 3.34V5a3 3 0 0 0 3 3 2 2 0 0 1 2 2c0 1.1.9 2 2 2a2 2 0 0 0 2-2c0-1.1.9-2 2-2h3.17"/><circle cx="12" cy="12" r="10"/></svg></button>
       <button class="icon view-toggle" id="listBtn" title="Список" aria-label="Список"><svg class="lucide" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg></button>
@@ -2657,7 +2661,7 @@ function render(){
   let h='<h3>Синхронизация</h3><p>Данные хранятся в вашем Google Drive (скрытая папка приложения), доступ к остальным файлам не запрашивается.</p>';
   h+='<div class="gm-st">'+(on?(valid()?'● Подключено. '+msg:'● Нужен вход. '+msg):'○ Не подключено. '+msg)+'</div>';
   if(!cid){
-    h+='<p>1) Создайте OAuth Client ID (инструкция в README). 2) Добавьте этот адрес в «Authorized JavaScript origins» и «Authorized redirect URIs»:</p><code>'+redirect()+'</code><input type="text" id="gmCid" placeholder="Client ID: xxxx.apps.googleusercontent.com"><button class="gm-b" id="gmSaveCid">Сохранить Client ID</button>';
+    h+='<p>Origins (без пути):</p><code>'+location.origin+'</code><p>Redirect URI:</p><code>'+redirect()+'</code><input type="text" id="gmCid" placeholder="Client ID: xxxx.apps.googleusercontent.com"><button class="gm-b" id="gmSaveCid">Сохранить Client ID</button>';
   }else if(!on||!valid()){
     h+='<button class="gm-b" id="gmLogin">Войти через Google</button>';
   }else{
@@ -2675,7 +2679,7 @@ function render(){
   const f=$('gmFile');if(f)f.onchange=importData;
 }
 async function exportData(){
-  const name='donevo-backup-'+new Date().toISOString().slice(0,10)+'.json';
+  const name='productivity-map-backup-'+new Date().toISOString().slice(0,10)+'.json';
   const file=new File([JSON.stringify(state,null,2)],name,{type:'application/json'});
   try{if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:name});return}}catch(e){if(e&&e.name==='AbortError')return}
   const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=name;document.body.appendChild(a);a.click();a.remove();

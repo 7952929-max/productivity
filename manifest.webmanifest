@@ -1,6 +1,6 @@
 {
- "name": "Donevo",
- "short_name": "Donevo",
+ "name": "Productivity Map",
+ "short_name": "Prod Map",
  "start_url": ".",
  "scope": ".",
  "display": "standalone",
