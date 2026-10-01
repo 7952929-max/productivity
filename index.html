@@ -2491,6 +2491,18 @@ setTimeout(()=>{
   launchAnimationFinished=true;
 },1500);
 
+/* Мост для блока синхронизации/экспорта (он в отдельном <script> и иначе не видит state) */
+window.gmBridge={
+  key:KEY,
+  get:()=>state,
+  set:(n)=>{
+    state=n;
+    try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}
+    if(currentId&&byId(currentId)){renderDetail()}
+    else{currentId=null;history.length=0;detail.classList.add("hidden");overview.classList.remove("hidden");renderOverview()}
+  }
+};
+
 })();
 </script>
 
@@ -2569,6 +2581,7 @@ setTimeout(()=>{
 (function(){
 const CID='gm_client_id',TOK='gm_token',FLAG='gm_google',FILE='goalmap.json',SCOPE='https://www.googleapis.com/auth/drive.appdata';
 const $=id=>document.getElementById(id);
+const S=()=>window.gmBridge.get();
 let token=null,exp=0,fileId=null,timer=null,busy=false,status='off',msg='';
 const redirect=()=>location.origin+location.pathname;
 try{const t=JSON.parse(localStorage.getItem(TOK)||'null');if(t&&t.exp>Date.now()+60000){token=t.t;exp=t.exp}}catch(e){}
@@ -2597,7 +2610,7 @@ async function findFile(){
   const j=await r.json();fileId=j.files&&j.files[0]?j.files[0].id:null;return fileId;
 }
 async function push(){
-  const body=JSON.stringify(state);
+  const body=JSON.stringify(S());
   if(!fileId)await findFile();
   if(fileId){await api('https://www.googleapis.com/upload/drive/v3/files/'+fileId+'?uploadType=media',{method:'PATCH',headers:{'Content-Type':'application/json'},body});return}
   const b='gm'+Math.random().toString(36).slice(2);
@@ -2607,8 +2620,7 @@ async function push(){
 }
 function applyState(n){
   n.nodes.forEach(x=>{if(typeof x.promoted!=='boolean')x.promoted=false;if(typeof x.archived!=='boolean')x.archived=false});
-  state=n;localStorage.setItem(KEY,JSON.stringify(state));
-  if(typeof renderOverview==='function')renderOverview();
+  window.gmBridge.set(n);
 }
 async function sync(manual){
   if(busy)return;
@@ -2619,10 +2631,10 @@ async function sync(manual){
     if(!fileId){await push()}
     else{
       const remote=await (await api('https://www.googleapis.com/drive/v3/files/'+fileId+'?alt=media')).json();
-      const rt=remote.updatedAt||0,lt=state.updatedAt||0;
+      const rt=remote.updatedAt||0,lt=S().updatedAt||0;
       if(!Array.isArray(remote.nodes)){await push()}
-      else if(!lt&&state.nodes.length){ // локальные данные ещё не синхронизировались — объединяем
-        const ids=new Set(remote.nodes.map(x=>x.id));state.nodes.forEach(x=>{if(!ids.has(x.id))remote.nodes.push(x)});
+      else if(!lt&&S().nodes.length){ // локальные данные ещё не синхронизировались — объединяем
+        const ids=new Set(remote.nodes.map(x=>x.id));S().nodes.forEach(x=>{if(!ids.has(x.id))remote.nodes.push(x)});
         remote.updatedAt=Date.now();applyState(remote);await push();
       }
       else if(rt>lt)applyState(remote);
@@ -2679,10 +2691,23 @@ function render(){
   const f=$('gmFile');if(f)f.onchange=importData;
 }
 async function exportData(){
-  const name='productivity-map-backup-'+new Date().toISOString().slice(0,10)+'.json';
-  const file=new File([JSON.stringify(state,null,2)],name,{type:'application/json'});
-  try{if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:name});return}}catch(e){if(e&&e.name==='AbortError')return}
-  const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=name;document.body.appendChild(a);a.click();a.remove();
+  try{
+    const name='productivity-map-backup-'+new Date().toISOString().slice(0,10)+'.json';
+    const text=JSON.stringify(S(),null,2);
+    const isMobile=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+    // На телефоне — системное меню «Поделиться / Сохранить в Файлы»
+    if(isMobile&&window.File&&navigator.canShare){
+      try{
+        const file=new File([text],name,{type:'application/json'});
+        if(navigator.canShare({files:[file]})){await navigator.share({files:[file],title:name});return}
+      }catch(e){if(e&&e.name==='AbortError')return}
+    }
+    // Обычное скачивание (компьютер и запасной вариант)
+    const url=URL.createObjectURL(new Blob([text],{type:'application/json'}));
+    const a=document.createElement('a');a.href=url;a.download=name;a.style.display='none';
+    document.body.appendChild(a);a.click();
+    setTimeout(()=>{a.remove();URL.revokeObjectURL(url)},4000);
+  }catch(err){alert('Не удалось сохранить файл: '+(err&&err.message||err))}
 }
 function importData(e){
   const f=e.target.files[0];if(!f)return;
