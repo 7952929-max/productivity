@@ -1606,13 +1606,13 @@ html,body{width:100%;max-width:100%;overflow-x:hidden;overscroll-behavior:none}
     <div class="detail-wrap">
       <div class="goal-card" id="goalCard">
         <button class="goal-check" id="goalCheck"></button>
-        <div class="goal-title" id="goalTitle"></div>
+        <textarea class="goal-title" id="goalTitle" rows="1" maxlength="120" spellcheck="false" enterkeyhint="done" aria-label="Название задачи"></textarea>
         <div class="goal-meta">
           <div class="goal-track"><i id="goalBar"></i></div>
           <div class="goal-pct" id="goalPct"></div>
         </div>
         <div class="ready-note hidden" id="readyNote">Все подзадачи готовы — осталось завершить саму задачу</div>
-        <div class="goal-card-actions"><button type="button" class="goal-edit-btn" id="goalEditBtn" title="Редактировать задачу" aria-label="Редактировать задачу"><svg class="lucide" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button><button class="goal-archive-btn" id="goalArchiveBtn">В архив</button><button type="button" class="goal-delete-btn" id="goalDeleteBtn" title="Удалить задачу" aria-label="Удалить задачу"><svg class="lucide" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><path d="M19 6l-1 14c-.1 1-1 2-2 2H8c-1 0-1.9-1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button></div>
+        <div class="goal-card-actions"><button class="goal-archive-btn" id="goalArchiveBtn">В архив</button><button type="button" class="goal-delete-btn" id="goalDeleteBtn" title="Удалить задачу" aria-label="Удалить задачу"><svg class="lucide" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><path d="M19 6l-1 14c-.1 1-1 2-2 2H8c-1 0-1.9-1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg></button></div>
       </div>
 
       <div class="section-title">Что отделяет от выполнения</div>
@@ -1734,7 +1734,7 @@ function overviewChildrenHTML(node){
       <span class="r-child-dot"></span>
       <span class="r-child-text">${escapeHTML(s.title)}</span>
     </div>`).join("")}
-    ${subs.length>3?`<div class="r-more">+ ещё ${subs.length-3}</div>`:""}
+    ${subs.length>3?`<div class="r-more">… ещё ${subs.length-3}</div>`:""}
   </div>`;
 }
 
@@ -1768,17 +1768,32 @@ function renderList(){
     card.className="goal-list-card"+(node.completed?" done":"");
     card.dataset.nodeId=node.id;
     card.innerHTML=`<button class="goal-list-grip" type="button" aria-label="Изменить позицию" title="Перетащить"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="7" r="1"/><circle cx="15" cy="7" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="17" r="1"/><circle cx="15" cy="17" r="1"/></svg></button><div class="goal-list-top"><button class="goal-list-check ${node.completed?"done":""}">${node.completed?icon("check"):""}</button><div class="goal-list-title">${escapeHTML(node.title)}</div></div>
-      ${visible.length?`<div class="goal-list-children">${visible.map(s=>`<div class="goal-list-child ${s.completed?"done":""}"><span class="goal-list-child-dot"></span><span>${escapeHTML(s.title)}</span></div>`).join("")}${subs.length>3?`<div>+ ещё ${subs.length-3}</div>`:""}</div>`:""}
+      ${visible.length?`<div class="goal-list-children">${visible.map(s=>`<div class="goal-list-child ${s.completed?"done":""}"><span class="goal-list-child-dot"></span><span>${escapeHTML(s.title)}</span></div>`).join("")}${subs.length>3?`<div>… ещё ${subs.length-3}</div>`:""}</div>`:""}
       <div class="goal-list-progress"><i style="width:${pct}%"></i></div>
       <div class="goal-list-foot"><span>${pct}%</span>${node.parentId?'<span class="goal-list-badge">из подзадачи</span>':""}</div>`;
     card.querySelector(".goal-list-check").onclick=e=>{e.stopPropagation();node.completed=!node.completed;save();renderOverview()};
-    card.onclick=(e)=>{if(e.target.closest('.goal-list-grip'))return;openDetail(node.id,false)};
-    listView.appendChild(card);
+    const row=document.createElement("div");row.className="swipe-row";row.dataset.nodeId=node.id;
+    row.innerHTML='<div class="swipe-actions"><button type="button" class="swipe-btn swipe-archive" aria-label="В архив">'+icon("archive")+'<span>В архив</span></button><button type="button" class="swipe-btn swipe-delete" aria-label="Удалить">'+icon("trash")+'<span>Удалить</span></button></div>';
+    card.onclick=(e)=>{
+      if(e.target.closest('.goal-list-grip'))return;
+      if(Date.now()<swipeBlockUntil)return;
+      if(row.classList.contains("open")){closeSwipeRow(row);return}
+      openDetail(node.id,false)
+    };
+    row.querySelector(".swipe-archive").onclick=e=>{e.stopPropagation();archiveNode(node)};
+    row.querySelector(".swipe-delete").onclick=e=>{
+      e.stopPropagation();
+      requestDelete("Удалить эту задачу и все её подзадачи без возможности восстановления?",()=>{
+        deleteNodeTree(node.id);showToast("Задача удалена");renderOverview();
+      });
+    };
+    row.appendChild(card);
+    listView.appendChild(row);
   });
   const add=document.createElement("button");add.className="goal-list-add";add.setAttribute("aria-label","Добавить задачу");add.innerHTML='<svg class="lucide" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></svg>';add.onclick=openRootModal;listView.appendChild(add);
 }
 function physicsCardWidth(count,viewportWidth){
-  if(isMobile())return 200;
+  if(isMobile())return 172;
   return count<=1?310:count===2?286:count===3?258:count<=5?236:218;
 }
 function clamp(v,min,max){return Math.max(min,Math.min(max,v))}
@@ -1790,7 +1805,7 @@ function physicsFrame(){
   return {
     w:r.width,h:r.height,cx:r.width/2,cy:r.height/2,rx:r.left,ry:r.top,
     hx:r.width/2,hy:mobile?addRoot.offsetTop:r.height/2,
-    top:mobile?12:70,bottom:mobile?30:34,left:mobile?10:24,right:mobile?10:24,plusR:mobile?52:52
+    top:mobile?Math.max(12,Math.round(((document.querySelector(".topbar")||{getBoundingClientRect:()=>({bottom:0})}).getBoundingClientRect().bottom)-r.top+10)):70,bottom:mobile?30:34,left:mobile?8:24,right:mobile?8:24,plusR:mobile?52:52
   };
 }
 function mobileSlots(count,f){
@@ -1864,15 +1879,16 @@ function layoutSlots(count,f){return isMobile()?mobileSlots(count,f):desktopSlot
    Карточки не пересекаются (мягкие силы + позиционная коррекция). */
 let fieldFrame=null,fieldDirty=true,pressedId=null,focusId=null,grab=null,planBH=130;
 const cardEls=new Map(),lineEls=new Map();
-const BW=200;
+const BW=172;
 const reduceMotion=!!(window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches);
 function currentFrame(){if(!fieldFrame||fieldDirty){fieldFrame=physicsFrame();fieldDirty=false}return fieldFrame}
 function planRegion(ids,R,plan){
   const M=ids.length,G=10;if(!M)return;
   let best=null;
-  for(let cols=(M<=2?1:2);cols<=M;cols++){
+  for(let cols=(M<=3?1:2);cols<=M;cols++){
     const rows=Math.ceil(M/cols),cw=R.w/cols,ch=R.h/rows;
-    const sc=Math.min((cw-G)/BW,(ch-G)/planBH);
+    const Gy=M<=3?20:G;
+    const sc=Math.min((cw-G)/BW,(ch-Gy)/planBH);
     if(!best||sc>best.s+.001)best={cols,rows,cw,ch,s:sc};
   }
   const {cols,rows,cw,ch}=best;
@@ -2157,7 +2173,7 @@ function openDetail(id,push){
 }
 function renderDetail(){
   const node=byId(currentId);if(!node){renderOverview();return}
-  goalTitle.textContent=node.title;goalCard.classList.toggle("done",node.completed);goalCheck.classList.toggle("done",node.completed);goalCheck.innerHTML=node.completed?icon("check"):"";
+  goalTitle.value=node.title;goalTitle.dataset.nodeId=node.id;requestAnimationFrame(()=>autosizeTA(goalTitle));goalCard.classList.toggle("done",node.completed);goalCheck.classList.toggle("done",node.completed);goalCheck.innerHTML=node.completed?icon("check"):"";
   const pct=Math.round(progress(node)*100);goalBar.style.width=pct+"%";goalPct.textContent=pct+"%";
   readyNote.classList.toggle("hidden",!allSubtasksReady(node));
 
@@ -2169,11 +2185,9 @@ function renderDetail(){
     const el=document.createElement("div");
     el.className="sub"+(s.completed?" done":"")+(s.promoted?" has-open":"")+(s.id===lastAddedSubId?" is-entering":"");
     el.innerHTML=`
-      <div class="sub-title">${escapeHTML(s.title)}</div>
-      
+      <textarea class="sub-title sub-title-input" rows="1" maxlength="120" spellcheck="false" enterkeyhint="done" aria-label="Подзадача">${escapeHTML(s.title)}</textarea>
       <div class="sub-actions">
         ${s.promoted?`<button class="sub-open-btn" title="Открыть задачу">${icon("chevronRight")}</button>`:""}
-        <button class="sub-edit-btn" title="Редактировать подзадачу" aria-label="Редактировать подзадачу">${icon("pencil")}</button>
         <button class="sub-delete-btn" title="Удалить подзадачу" aria-label="Удалить подзадачу">${icon("trash")}</button>
         <button class="promote-btn ${s.promoted?"active":""}" title="${s.promoted?"Убрать с главной":"Добавить на главную"}">${icon("arrowUpRight")}</button>
         <button class="sub-check ${s.completed?"done":""}">${s.completed?icon("check"):""}</button>
@@ -2186,7 +2200,17 @@ function renderDetail(){
       showToast(s.promoted?"Задача добавлена на главную":"Задача убрана с главной");
       renderDetail();
     };
-    el.querySelector(".sub-edit-btn").onclick=e=>{e.stopPropagation();openEditModal(s)};
+    const ta=el.querySelector(".sub-title-input");
+    ta.addEventListener("input",()=>autosizeTA(ta));
+    ta.addEventListener("keydown",e=>{
+      if(e.key==="Enter"){e.preventDefault();ta.blur()}
+      if(e.key==="Escape"){ta.value=s.title;ta.blur()}
+    });
+    ta.addEventListener("blur",()=>{
+      const v=ta.value.replace(/\s+/g," ").trim();
+      if(v&&v!==s.title){s.title=v;save()}
+      ta.value=s.title;autosizeTA(ta);
+    });
     el.querySelector(".sub-delete-btn").onclick=e=>{
       e.stopPropagation();
       requestDelete("Удалить эту подзадачу и все вложенные в неё задачи без возможности восстановления?",()=>{
@@ -2205,7 +2229,7 @@ function renderDetail(){
     if(s.promoted){
       el.classList.add("can-open");
       el.onclick=(e)=>{
-        if(e.target.closest("button")) return;
+        if(e.target.closest("button,textarea")) return;
         openDetail(s.id,true);
       };
     }else{
@@ -2213,6 +2237,7 @@ function renderDetail(){
     }
     subList.appendChild(el);
   });
+  subList.querySelectorAll(".sub-title-input").forEach(autosizeTA);
 
   if(inlineCreating){
     const draft=document.createElement("div");
@@ -2220,9 +2245,8 @@ function renderDetail(){
     draft.innerHTML=`
       <div class="inline-row">
         <span class="inline-bullet"></span>
-        <input class="inline-input" id="inlineSubInput" maxlength="120" placeholder="Новая подзадача">
+        <input class="inline-input" id="inlineSubInput" maxlength="120" placeholder="Новая подзадача" enterkeyhint="done">
       </div>
-      <div class="inline-help">Enter — сохранить и добавить следующую · пустой Enter — закончить</div>
     `;
     subList.appendChild(draft);
 
@@ -2232,6 +2256,7 @@ function renderDetail(){
         e.preventDefault();
         const value=field.value.trim();
 
+        field.dataset.done="1";
         if(!value){
           inlineCreating=false;
           renderDetail();
@@ -2246,9 +2271,20 @@ function renderDetail(){
       }
 
       if(e.key==="Escape"){
+        field.dataset.done="1";
         inlineCreating=false;
         renderDetail();
       }
+    });
+    // Тап в любое другое место = сохранить (как в «Заметках»)
+    field.addEventListener("blur",()=>{
+      if(field.dataset.done)return;
+      field.dataset.done="1";
+      const value=field.value.trim();
+      const parent=currentId;
+      if(value&&byId(parent))addNode(value,parent);
+      inlineCreating=false;
+      setTimeout(()=>{if(!detail.classList.contains("hidden")&&!inlineCreating)renderDetail()},180);
     });
 
     setTimeout(()=>{
@@ -2321,8 +2357,19 @@ function resizeRootInput(){
 rootInput.addEventListener("input",resizeRootInput);
 rootModal.onclick=e=>{if(e.target===rootModal)closeRootModal()};
 
+function autosizeTA(t){if(!t)return;t.style.height="auto";t.style.height=(t.scrollHeight)+"px"}
+goalTitle.addEventListener("input",()=>autosizeTA(goalTitle));
+goalTitle.addEventListener("keydown",e=>{
+  if(e.key==="Enter"){e.preventDefault();goalTitle.blur()}
+  if(e.key==="Escape"){const n=byId(goalTitle.dataset.nodeId);if(n)goalTitle.value=n.title;goalTitle.blur()}
+});
+goalTitle.addEventListener("blur",()=>{
+  const n=byId(goalTitle.dataset.nodeId);if(!n)return;
+  const v=goalTitle.value.replace(/\s+/g," ").trim();
+  if(v&&v!==n.title){n.title=v;save()}
+  goalTitle.value=n.title;autosizeTA(goalTitle);
+});
 goalCheck.onclick=()=>{const n=byId(currentId);if(!n)return;n.completed=!n.completed;save();renderDetail()};
-goalEditBtn.onclick=()=>{const n=byId(currentId);if(!n)return;openEditModal(n)};
 goalArchiveBtn.onclick=()=>{const n=byId(currentId);if(!n)return;archiveNode(n)};
 goalDeleteBtn.onclick=(e)=>{
   e.preventDefault();
@@ -2394,6 +2441,51 @@ listView.addEventListener('pointermove',e=>{
 });
 listView.addEventListener('pointerup',e=>{if(listReorder&&e.pointerId===listReorder.pointerId){e.preventDefault();finishListReorder(false)}});
 listView.addEventListener('pointercancel',e=>{if(listReorder&&e.pointerId===listReorder.pointerId)finishListReorder(true)});
+
+/* v30: свайп влево по карточке в списке — «В архив» и «Удалить», как в Заметках на iPhone */
+const SWIPE_W=164;
+let swipe=null,swipeBlockUntil=0;
+function setSwipeRow(row,open){
+  const card=row.querySelector(".goal-list-card");if(!card)return;
+  card.style.transition="";
+  card.style.transform=open?"translateX(-"+SWIPE_W+"px)":"";
+  row.classList.toggle("open",open);row.classList.remove("swiping");
+}
+function closeSwipeRow(row){if(row)setSwipeRow(row,false)}
+function closeAllSwipeRows(except){listView.querySelectorAll(".swipe-row.open").forEach(r=>{if(r!==except)closeSwipeRow(r)})}
+listView.addEventListener("pointerdown",e=>{
+  if(viewMode!=="list"||(e.pointerType==="mouse"&&e.button!==0))return;
+  if(e.target.closest(".goal-list-grip,.swipe-btn,.goal-list-add"))return;
+  const card=e.target.closest(".goal-list-card");
+  if(!card){closeAllSwipeRows();return}
+  const row=card.parentElement;
+  closeAllSwipeRows(row);
+  swipe={card,row,id:e.pointerId,x0:e.clientX,y0:e.clientY,base:row.classList.contains("open")?-SWIPE_W:0,x:0,mode:null};
+});
+listView.addEventListener("pointermove",e=>{
+  if(!swipe||e.pointerId!==swipe.id||listReorder)return;
+  const dx=e.clientX-swipe.x0,dy=e.clientY-swipe.y0;
+  if(!swipe.mode){
+    if(Math.abs(dx)>8&&Math.abs(dx)>Math.abs(dy)*1.3){
+      swipe.mode="h";swipe.card.style.transition="none";swipe.row.classList.add("swiping");
+      try{swipe.card.setPointerCapture(e.pointerId)}catch(_){}
+    }else if(Math.abs(dy)>8){swipe=null;return}
+    else return;
+  }
+  let x=swipe.base+dx;
+  if(x>0)x=0;
+  if(x<-SWIPE_W)x=-SWIPE_W+(x+SWIPE_W)*.25; // небольшое сопротивление
+  swipe.x=x;swipe.card.style.transform="translateX("+x+"px)";
+});
+function endSwipe(cancel){
+  if(!swipe)return;const sw=swipe;swipe=null;
+  if(sw.mode!=="h")return;
+  swipeBlockUntil=Date.now()+350;
+  const open=!cancel&&sw.x<-SWIPE_W*.4;
+  setSwipeRow(sw.row,open);
+}
+listView.addEventListener("pointerup",e=>{if(swipe&&e.pointerId===swipe.id)endSwipe(false)});
+listView.addEventListener("pointercancel",e=>{if(swipe&&e.pointerId===swipe.id)endSwipe(true)});
 
 listBtn.onclick=()=>setViewMode("list");
 archiveBtn.onclick=openArchive;
@@ -2857,4 +2949,51 @@ if('serviceWorker' in navigator&&location.protocol.indexOf('http')===0)navigator
 @media(max-width:600px){
   .mobile-orbit .r-node:active{transform:translate(-50%,-50%) rotate(var(--card-rot,0deg)) scale(1)!important;}
 }
+</style>
+
+<style id="v30-overrides">
+/* ===== v30 ===== */
+/* Заголовок и подзадачи редактируются прямо на месте */
+textarea.goal-title,textarea.sub-title-input{
+  -webkit-appearance:none;appearance:none;border:0!important;outline:0!important;background:transparent!important;
+  resize:none;overflow:hidden;width:100%;margin:0;box-shadow:none!important;border-radius:0!important;
+  font-family:inherit;color:var(--ui-text,#111)!important;caret-color:var(--ui-blue,#3aa7f2);
+  -webkit-user-select:text;user-select:text;display:block!important;
+}
+textarea.goal-title{padding-top:2px!important;padding-bottom:2px!important;min-height:0!important;box-sizing:border-box;display:block!important}
+textarea.sub-title-input{flex:1 1 auto;min-width:0;padding:13px 0!important;font-size:16px!important;line-height:1.3!important;font-weight:500!important;box-sizing:border-box;cursor:text}
+.sub.done textarea.sub-title-input{color:#999!important;text-decoration:line-through;text-decoration-thickness:1px}
+.sub:not(.inline-new){padding-right:104px!important}
+.sub.has-open:not(.inline-new){padding-right:140px!important}
+.sub.inline-new .inline-input{font-size:16px!important}
+
+/* Главная: кружок «+» не обрезается, радиальное поле — ровно по экрану */
+@media (max-width:640px){
+  #overview .radial{top:0!important;height:100dvh!important;transform:none!important;left:0!important;width:100%!important}
+  #overview .radial .center-add{top:calc(100% - 62px - env(safe-area-inset-bottom,0px))!important}
+
+  /* Карточки: крупнее текст, 3 подзадачи + «…» */
+  #overview .radial.mobile-orbit .r-node{padding:14px 14px 12px!important;border-radius:24px!important;min-height:0!important}
+  #overview .radial.mobile-orbit .r-title{font-size:16px!important;line-height:1.18!important;padding-right:30px!important;-webkit-line-clamp:2}
+  #overview .radial.mobile-orbit .r-children{max-height:none!important;overflow:visible!important;margin-top:8px!important;padding-top:0!important;gap:5px!important}
+  #overview .radial.mobile-orbit .r-children .r-child{display:flex!important;font-size:12.5px!important;line-height:1.2!important}
+  #overview .radial.mobile-orbit .r-children .r-child-dot{width:10px!important;height:10px!important;flex-basis:10px!important}
+  #overview .radial.mobile-orbit .r-more{display:block!important;font-size:13px!important;line-height:1.1!important;padding-left:17px!important;color:#8a8a90!important}
+  #overview .radial.mobile-orbit .r-progress{margin-top:11px!important;height:5px!important}
+  #overview .radial.mobile-orbit .r-percent{font-size:11px!important}
+  #overview .radial.mobile-orbit .r-node.done .r-progress{margin-right:46px!important}
+}
+
+.r-node.done .r-progress{margin-right:46px!important}
+
+/* Список: свайп влево */
+.swipe-row{position:relative}
+.swipe-actions{position:absolute;top:0;bottom:0;right:0;width:164px;display:flex;gap:6px;padding-left:6px;box-sizing:border-box;opacity:0;pointer-events:none;transition:opacity .12s}
+.swipe-row.swiping .swipe-actions,.swipe-row.open .swipe-actions{opacity:1}
+.swipe-row.open .swipe-actions{pointer-events:auto}
+.swipe-btn{flex:1;border:0;border-radius:20px;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;font:600 12px/1 -apple-system,BlinkMacSystemFont,"SF Pro Text",Arial,sans-serif;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.swipe-btn .lucide{width:22px;height:22px}
+.swipe-archive{background:#ff9f0a}
+.swipe-delete{background:#ff3b30}
+.swipe-row .goal-list-card{will-change:transform;transition:transform .22s cubic-bezier(.2,.8,.2,1)}
 </style>
