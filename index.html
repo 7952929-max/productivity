@@ -2674,6 +2674,10 @@ window.gmBridge={
 const CID='gm_client_id',TOK='gm_token',FLAG='gm_google',FILE='goalmap.json',SCOPE='https://www.googleapis.com/auth/drive.appdata';
 const $=id=>document.getElementById(id);
 const S=()=>window.gmBridge.get();
+/* ВПИШИТЕ СЮДА ВАШ Client ID (xxxx.apps.googleusercontent.com) — тогда он будет работать на любом устройстве и в режиме инкогнито.
+   Это не секрет: Client ID публичный, его можно хранить в коде. */
+const DEFAULT_CID='88159733798-2qo9hv7klfiflo3kktoafpfoejd0tutq.apps.googleusercontent.com';
+const getCid=()=>DEFAULT_CID||localStorage.getItem(CID)||'';
 let token=null,exp=0,fileId=null,timer=null,busy=false,status='off',msg='';
 const redirect=()=>location.origin+location.pathname;
 try{const t=JSON.parse(localStorage.getItem(TOK)||'null');if(t&&t.exp>Date.now()+60000){token=t.t;exp=t.exp}}catch(e){}
@@ -2686,7 +2690,7 @@ if(location.hash.length>1){
 }
 const valid=()=>token&&exp>Date.now()+30000;
 function login(silent){
-  const cid=localStorage.getItem(CID);if(!cid){open();return}
+  const cid=getCid();if(!cid){open();return}
   const u=new URLSearchParams({client_id:cid,redirect_uri:redirect(),response_type:'token',scope:SCOPE,include_granted_scopes:'true',state:String(Date.now())});
   if(silent)u.set('prompt','none');
   location.href='https://accounts.google.com/o/oauth2/v2/auth?'+u;
@@ -2761,7 +2765,7 @@ function open(){$('gmSheet').classList.add('open');render()}
 function close(){$('gmSheet').classList.remove('open')}
 function render(){
   const c=$('gmCard');if(!c)return;
-  const cid=localStorage.getItem(CID),on=!!localStorage.getItem(FLAG);
+  const cid=getCid(),on=!!localStorage.getItem(FLAG);
   let h='<h3>Синхронизация</h3><p>Данные хранятся в вашем Google Drive (скрытая папка приложения), доступ к остальным файлам не запрашивается.</p>';
   h+='<div class="gm-st">'+(on?(valid()?'● Подключено. '+msg:'● Нужен вход. '+msg):'○ Не подключено. '+msg)+'</div>';
   if(!cid){
@@ -2772,7 +2776,7 @@ function render(){
     h+='<button class="gm-b" id="gmNow">Синхронизировать сейчас</button><button class="gm-b sec" id="gmOut">Выйти</button>';
   }
   h+='<button class="gm-b sec" id="gmExp">Экспорт в файл</button><button class="gm-b sec" id="gmImp">Импорт из файла</button>';
-  if(cid)h+='<button class="gm-b sec" id="gmCidReset" style="font-size:13px">Сменить Client ID</button>';
+  if(cid&&!DEFAULT_CID)h+='<button class="gm-b sec" id="gmCidReset" style="font-size:13px">Сменить Client ID</button>';
   h+='<button class="gm-b sec" id="gmClose">Закрыть</button><input type="file" id="gmFile" accept="application/json,.json" style="display:none">';
   c.innerHTML=h;
   const on2=(i,f)=>{const e=$(i);if(e)e.onclick=f};
@@ -2815,7 +2819,7 @@ mount();
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&localStorage.getItem(FLAG)&&valid())sync(false)});
 window.addEventListener('online',()=>{if(valid())sync(false)});
 // автозапуск
-if(localStorage.getItem(FLAG)&&localStorage.getItem(CID)){
+if(localStorage.getItem(FLAG)&&getCid()){
   if(valid())sync(false);
   else{const last=+sessionStorage.getItem('gm_fail')||0;if(Date.now()-last>60000&&!sessionStorage.getItem('gm_try')){sessionStorage.setItem('gm_try','1');login(true)}else setStatus('warn')}
 }
